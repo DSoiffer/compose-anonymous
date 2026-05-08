@@ -1,4 +1,4 @@
-# Anisotropic Gaussian FKC Experiment
+# 2D Gaussian FKC Experiment (and others)
 
 Composing diagonal-Gaussian distributions with different covariance structures
 via Feynman-Kac correctors (FKC).
