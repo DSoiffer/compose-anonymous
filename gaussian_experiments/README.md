@@ -3,7 +3,7 @@
 Two experiments that compose simple distributions via Feynman-Kac correctors
 (FKC), corresponding to the 2D Gaussian and Gaussian mixture experiments in the paper.
 
-- The **Gaussian mixture (GMM)** experiment composes three attributes
+- The **Gaussian mixture (GMM)** experiment composes three conditions
   (`a1`, `a2`, `base`) built from a shared 2-D isotropic GMM, with target `a1 * a2 / base`. (The target is not itself a GMM in general, so ground-truth samples come from either rejection sampling or importance sampling on the exact ratio density.)
 - The **2D Gaussian** experiment composes three diagonal Gaussians (`a1`,
   `a2`, `base`) with different covariance structures, with target `a1 * a2 / base`.(The analytical target is a Gaussian, so ground-truth samples come from closed-form sampling.)

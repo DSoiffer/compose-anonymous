@@ -1,6 +1,6 @@
 # In-distribution Gaussian mixture FKC experiment.
 #
-# Three attributes (a1, a2, base), each an IsotropicGMM sharing the same means
+# Three conditions (a1, a2, base), each an IsotropicGMM sharing the same means
 # and std but with different component weights. The analytical target is the
 # product a1 * a2 / base, which is in general not a GMM, so we sample it via
 # rejection or importance sampling on the exact ratio density.
@@ -26,10 +26,10 @@ single_shot:
   k_particles: 16
   n_steps: 500
   train_iters: 20000
-  training_size: 10000        # size of the fixed training pool drawn once per attribute
+  training_size: 10000        # size of the fixed training pool drawn once per condition
   grid_range: 6.0
   fig_ext: ".pdf"
-  mode: "conditional"         # "separate" (one model per attribute) or "conditional" (one shared model)
+  mode: "conditional"         # "separate" (one model per condition) or "conditional" (one shared model)
 
 sweep:
   seed: 1

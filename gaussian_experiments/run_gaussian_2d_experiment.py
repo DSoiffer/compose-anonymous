@@ -155,7 +155,7 @@ def train_separate_models(schedule, dist_a1, dist_a2, dist_base, device,
 def train_conditional_models(schedule, dist_a1, dist_a2, dist_base, device,
                              num_iterations, training_size):
     print(f"     Training single conditional model over a1, a2, base "
-          f"(pool size = {training_size} per attribute)")
+          f"(pool size = {training_size} per condition)")
     cond_model = train_conditional_score_model(
         data_fns=[
             fixed_pool_data_fn(d, training_size)
@@ -167,7 +167,7 @@ def train_conditional_models(schedule, dist_a1, dist_a2, dist_base, device,
     return [BoundConditionalModel(cond_model, idx) for idx in range(3)]
 
 
-def _attribute_labels(dist_a1, dist_a2, dist_base):
+def _condition_labels(dist_a1, dist_a2, dist_base):
     return [
         f"$P_{{a_1}} = \\mathcal{{N}}(0, {_diag_text(dist_a1.variances)})$",
         f"$P_{{a_2}} = \\mathcal{{N}}(0, {_diag_text(dist_a2.variances)})$",
@@ -196,7 +196,7 @@ def main(config: Gaussian2DConfig):
     print(f"base: N(0, {_diag_text(dist_base.variances)})")
     print(f"Target a1*a2/base: N(0, {_diag_text(dist_gt.variances)})")
     print(f"Mode:      {ss.mode}")
-    print(f"Pool size: {ss.training_size} per attribute")
+    print(f"Pool size: {ss.training_size} per condition")
     print(f"Output dir: {figures_dir}")
 
     torch.manual_seed(ss.seed)
@@ -245,7 +245,7 @@ def main(config: Gaussian2DConfig):
     fig_overview = plot_distributions_overview(
         true_samples=true_samples,
         learned_samples=learned_marginals,
-        true_labels=_attribute_labels(dist_a1, dist_a2, dist_base),
+        true_labels=_condition_labels(dist_a1, dist_a2, dist_base),
         learned_labels=["Learned $a_1$", "Learned $a_2$", "Learned base"],
         colors=["tab:blue", "tab:orange", "tab:gray"],
         grid_range=ss.grid_range,

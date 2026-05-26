@@ -1,4 +1,4 @@
-"""Gaussian mixture experiment: composing isotropic-GMM attributes via FKC.
+"""Gaussian mixture experiment: composing isotropic-GMM conditions via FKC.
 
 Three conditions (a1, a2, base) share the same component means and std but
 have different component weights, analytical target is a1 * a2 / base.
@@ -157,7 +157,7 @@ def train_separate_models(schedule, gmm_a1, gmm_a2, gmm_base, device,
 def train_conditional_models(schedule, gmm_a1, gmm_a2, gmm_base, device,
                              num_iterations, training_size):
     print(f"     Training single conditional model over a1, a2, base "
-          f"(pool size = {training_size} per attribute)")
+          f"(pool size = {training_size} per condition)")
     cond_model = train_conditional_score_model(
         data_fns=[
             fixed_pool_data_fn(g, training_size)
@@ -195,7 +195,7 @@ def main(config: GMMConfig):
     print(f"sigma:      {config.component_std}")
     print(f"GT sampler: {config.sampler}")
     print(f"Mode:       {ss.mode}")
-    print(f"Pool size:  {ss.training_size} per attribute")
+    print(f"Pool size:  {ss.training_size} per condition")
     print(f"Target: p_a1 * p_a2 / p_base (exact ratio, not a GMM)")
     print(f"Output dir: {figures_dir}")
 
