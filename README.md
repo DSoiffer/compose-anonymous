@@ -5,4 +5,4 @@ Experimental code for reproducing our results is provided in `gaussian_experimen
 ## Setup
 Before running, ensure you have installed all dependencies with `uv sync` from the root directory. `uv` can be installed [here](https://docs.astral.sh/uv/getting-started/installation/).
 
-Depending on your GPU's PyTorch compatibility, you may need to alter all instances of `cu130` in pyproject.toml to a later version (e.g., `cu129`), and rerun `uv sync`. Gaussian experiments can also be run on the CPU, but at reduced speed.
+Depending on your GPU's PyTorch compatibility, you may need to alter all instances of `cu130` in pyproject.toml to an earlier version (e.g., `cu129` for CUDA 12.9), and rerun `uv sync`. Gaussian experiments can also be run on the CPU, but at reduced speed.
