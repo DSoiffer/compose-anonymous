@@ -15,7 +15,7 @@ import pandas as pd
 import torch
 from matplotlib import pyplot as plt
 
-from feynman_kac import feynman_kac_sample, naive_composed_sample
+from feynman_kac import feynman_kac_sample
 from evaluation import compute_distribution_metrics
 
 TrainFn = Callable[[Any], list]
@@ -78,19 +78,20 @@ def sweep_training_and_particles(
     pc_label: Callable[[Any], str] | None = None,
     title: str = "Training-vs-particles sweep",
     n_gt_samples: int = 5000,
+    overlay_means: np.ndarray | None = None,
 ) -> dict:
     """Run feynman_kac_sample over a (training_size x particle_count) grid.
 
     train_and_get_score_fns: training_size -> list[score_fn]. training_size
     may be any value (int sample count, "analytical", etc.).
-    particle_counts: K values; "naive" maps to naive_composed_sample.
+    particle_counts: K values (per-swarm SMC ensemble size).
     n_output: number of output samples per cell.
     n_runs: independent runs per cell (re-seeded and re-trained per run).
     """
     if ts_label is None:
         ts_label = lambda ts: str(ts)
     if pc_label is None:
-        pc_label = lambda pc: "naive" if pc == "naive" else f"K={pc}"
+        pc_label = lambda pc: f"K={pc}"
 
     metrics_by_cell: dict[tuple[Any, Any], list[dict]] = {}
     samples_by_cell: dict[tuple[Any, Any], np.ndarray] = {}
@@ -105,33 +106,21 @@ def sweep_training_and_particles(
         print("#" * 70)
 
         for ts in training_sizes:
-            print(f"\n--- training_size={ts_label(ts)} ---")
+            print(f"\n    training_size={ts_label(ts)}")
             score_fns = train_and_get_score_fns(ts)
 
             for pc in particle_counts:
-                if pc == "naive":
-                    x_final = naive_composed_sample(
-                        score_fns,
-                        betas,
-                        schedule,
-                        ndim=ndim,
-                        n_output=n_output,
-                        n_steps=n_steps,
-                        device=device,
-                        verbose=False,
-                    )
-                else:
-                    x_final = feynman_kac_sample(
-                        score_fns,
-                        betas,
-                        schedule,
-                        ndim=ndim,
-                        n_output=n_output,
-                        n_particles=pc,
-                        n_steps=n_steps,
-                        device=device,
-                        verbose=False,
-                    )
+                x_final = feynman_kac_sample(
+                    score_fns,
+                    betas,
+                    schedule,
+                    ndim=ndim,
+                    n_output=n_output,
+                    n_particles=pc,
+                    n_steps=n_steps,
+                    device=device,
+                    verbose=False,
+                )
                 samples = x_final.cpu().numpy()
                 m = compute_distribution_metrics(
                     samples,
@@ -161,6 +150,7 @@ def sweep_training_and_particles(
             plot_color,
             out_path,
             title,
+            overlay_means=overlay_means,
         )
 
     if out_tex_path is not None:
@@ -288,6 +278,7 @@ def _plot_grid(
     plot_color: str,
     out_path: str,
     title: str,
+    overlay_means: np.ndarray | None = None,
 ) -> None:
     n_rows = len(training_sizes)
     n_cols = len(particle_counts)
@@ -302,6 +293,11 @@ def _plot_grid(
             ax = axes[i, j]
             s = samples_by_cell[(ts, pc)]
             ax.scatter(s[:, 0], s[:, 1], s=2, alpha=0.3, color=plot_color)
+            if overlay_means is not None:
+                ax.scatter(
+                    overlay_means[:, 0], overlay_means[:, 1],
+                    marker="x", s=80, c="k", linewidths=2.0, alpha=0.9, zorder=10,
+                )
             agg = aggregated[(ts, pc)]
             label_lines = []
             if "sw2" in agg:

@@ -1,15 +1,4 @@
-"""Feynman-Kac corrector (FKC) sampler for diffusion product distributions.
-
-Given K score functions s_i(x, t) approx grad log q_t^i(x) and weights beta_i,
-samples from the product/ratio distribution
-
-    p(x) propto prod_i  q^i(x)^{beta_i}
-
-using the reverse-time SDE with importance-weight (FKC) corrections.
-The sampler runs n_output independent K-particle swarms, resampling every step.
-
-Reference: Skreta et al., "Feynman-Kac Correctors in Diffusion", ICML 2025.
-"""
+"""Feynman-Kac corrector (FKC) sampler for diffusion product distributions."""
 
 from __future__ import annotations
 
@@ -51,7 +40,8 @@ def feynman_kac_sample(
     *,
     n_particles: int = 8,
     n_steps: int = 500,
-    device: torch.device | str = "cpu",
+    g_clip: float | None = 10.0,
+    device: torch.device | str = "cuda",
     verbose: bool = True,
 ) -> torch.Tensor:
     """Sample n_output samples from p(x) propto prod q_i(x)^{beta_i} via FKC.
@@ -60,8 +50,6 @@ def feynman_kac_sample(
     vectorized as a single batch of size N*K through the reverse SDE.
     Resampling is applied per-swarm at every step. At the end, each swarm
     draws one sample from its weighted ensemble.
-
-    Total compute is approximately N*K particle-trajectories.
     """
     device = torch.device(device)
     dt = 1.0 / n_steps
@@ -81,17 +69,20 @@ def feynman_kac_sample(
             t_val = min(t_val, 1.0 - 1e-5)
             t = torch.full((B, 1), t_val, device=device)
 
+            # Evaluate scores
             if cached_scores is None:
                 scores = [fn(t, x) for fn in score_fns]
             else:
                 scores = cached_scores
             weighted_score = sum(b * s for b, s in zip(betas, scores))
 
+            # Reverse SDE step
             a_t = schedule.drift_coeff(t)
             sigma_sde = schedule.diffusion(t)
             drift = a_t * x + sigma_sde**2 * weighted_score
             x = x + drift * dt + sigma_sde * np.sqrt(dt) * torch.randn_like(x)
 
+            # FKC weight increment
             t_next = max(min((step + 1) * dt, 1.0 - 1e-5), 1e-5)
             t_n = torch.full((B, 1), t_next, device=device)
 
@@ -105,10 +96,13 @@ def feynman_kac_sample(
             div_f = ndim * schedule.drift_coeff(t_n).squeeze(1)
 
             g = (beta_sum - 1.0) * div_f + 0.5 * s2_scalar * (norm_ws_sq - weighted_norm_sq)
+            if g_clip is not None:
+                g = g.clamp(-g_clip, g_clip)
             log_w = log_w + (g * dt).view(N, K)
 
             cached_scores = scores_new
 
+            # Per-swarm resampling
             idx_local = _batched_systematic_resample(log_w)
             offset = (torch.arange(N, device=device) * K)[:, None]
             flat_idx = (idx_local + offset).view(-1)
@@ -130,16 +124,15 @@ def naive_composed_sample(
     n_output: int,
     *,
     n_steps: int = 500,
-    device: torch.device | str = "cpu",
+    device: torch.device | str = "cuda",
     verbose: bool = False,
 ) -> torch.Tensor:
     """Naive composed-score reverse-SDE sampling: no FKC correction.
 
     At each step, evaluates all score functions at the shared point x_t,
-    forms s_combined = sum_i beta_i s_i(x_t, t), and takes one Euler-Maruyama
-    step of the reverse SDE. This is the classic "score arithmetic" baseline.
-    It is equivalent to the regular FKC sampler with K=1, but more efficient
-    since it does not perform unnecessary steps.
+    forms s_combined = sum_i beta_i s_i(x_t, t), and takes one step of 
+    the reverse SDE. It is equivalent to the FKC sampler with K=1 (but 
+    more efficient since it does not perform unnecessary steps).
     """
     device = torch.device(device)
     dt = 1.0 / n_steps

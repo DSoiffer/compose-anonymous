@@ -1,4 +1,4 @@
-"""PyTorch Variance-Preserving (VP) noise schedule for diffusion models.
+"""Variance-Preserving (VP) noise schedule for the diffusion models.
 
 Convention: t in [0, 1] where t=0 is pure noise and t=1 is clean data.
 Note: this is reverse from the paper.
