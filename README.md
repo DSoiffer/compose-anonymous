@@ -1,4 +1,4 @@
-# Code for Catastrophic Compositional Generation: Why Vanilla Diffusion Models Fail to Extrapolate
+# Code for When is Compositional Generation Feasible? Distributional Estimation Error and Inference-time Approximation Error in Diffusion Models
 
 Experimental code for reproducing our results is provided in `gaussian_experiments` for the Gaussian experiments, and `room_experiments` for the room experiments. Additional instructions are in each of those directories.
 
