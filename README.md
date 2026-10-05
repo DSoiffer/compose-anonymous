@@ -1,6 +1,6 @@
 # Code for When is Compositional Generation Feasible? Distributional Estimation Error and Inference-time Approximation Error in Diffusion Models
 
-This repository contains the code for the experiments in the paper. Each directory has its own README with instructions, please see thoes for further instructions.
+This repository contains the code for the experiments in the paper. Each directory has its own README with instructions, please see those for further instructions.
 
 | Directory | Contents | Requires |
 |---|---|---|
