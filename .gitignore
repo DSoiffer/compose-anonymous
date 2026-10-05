@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+
+# Outputs that scripts write inside the package directories
+gaussian_experiments/figures/
+sensitivity_metric/gaussian/results/
+sensitivity_metric/gaussian/figures/
+room_experiments/training_prompts.yaml

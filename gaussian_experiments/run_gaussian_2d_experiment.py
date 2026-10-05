@@ -4,8 +4,8 @@ Three zero-mean diagonal Gaussians in 2D: a1, a2, base. The analytical target
 is the product/ratio a1 * a2 / base.
 
 Two entry points:
-  python run_gaussian_2d_experiment.py [--config PATH]
-  python run_gaussian_2d_experiment.py [--config PATH] --sweep
+  python -m gaussian_experiments.run_gaussian_2d_experiment [--config PATH]
+  python -m gaussian_experiments.run_gaussian_2d_experiment [--config PATH] --sweep
 """
 
 import os
@@ -13,19 +13,19 @@ import os
 import numpy as np
 import torch
 
-from gmm_lib import DiagonalGaussian, analytical_product_ratio_diagonal
-from noise_schedule import VPSchedule
-from score_model import (
+from gaussian_experiments.gmm_lib import DiagonalGaussian, analytical_product_ratio_diagonal
+from gaussian_experiments.noise_schedule import VPSchedule
+from gaussian_experiments.score_model import (
     train_score_model,
     train_conditional_score_model,
     BoundConditionalModel,
     sample_eps_model,
 )
-from feynman_kac import feynman_kac_sample
-from evaluation import compute_distribution_metrics
-from sweep import sweep_training_and_particles
-from config import Gaussian2DConfig, CONFIGS_DIR, load_gaussian_2d_config
-from plotting import (
+from gaussian_experiments.feynman_kac import feynman_kac_sample
+from gaussian_experiments.evaluation import compute_distribution_metrics
+from gaussian_experiments.sweep import sweep_training_and_particles
+from gaussian_experiments.config import Gaussian2DConfig, CONFIGS_DIR, load_gaussian_2d_config
+from gaussian_experiments.plotting import (
     plot_comparison_summary,
     plot_distributions_overview,
     print_metrics,
@@ -36,7 +36,7 @@ from plotting import (
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 FIGURES_ROOT = os.path.join(SCRIPT_DIR, "figures")
 D = 2
-DEFAULT_CONFIG = str(CONFIGS_DIR / "gaussian_2d.yaml")
+DEFAULT_CONFIG = str(CONFIGS_DIR / "gaussian_2d_fc_ood.yaml")
 
 
 def _fmt_var(v: float) -> str:

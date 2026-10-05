@@ -1,0 +1,22 @@
+# CelebA FC_ID: Bangs (A) + Mouth_Slightly_Open (B), ID regime.
+# Classes are the stratum folders written by export_strata.py:
+# q00 neither, q10 A only, q01 B only, q11 both.
+conditions:
+  - name: base
+    classes:
+      q00: 0.99
+      q10: 0.0033333333333333335
+      q01: 0.0033333333333333335
+      q11: 0.0033333333333333335
+  - name: PA
+    classes:
+      q00: 0
+      q10: 0.5
+      q01: 0
+      q11: 0.5
+  - name: PB
+    classes:
+      q00: 0
+      q10: 0
+      q01: 0.5
+      q11: 0.5

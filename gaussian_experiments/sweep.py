@@ -15,8 +15,8 @@ import pandas as pd
 import torch
 from matplotlib import pyplot as plt
 
-from feynman_kac import feynman_kac_sample
-from evaluation import compute_distribution_metrics
+from gaussian_experiments.feynman_kac import feynman_kac_sample
+from gaussian_experiments.evaluation import compute_distribution_metrics
 
 TrainFn = Callable[[Any], list]
 

@@ -1,5 +1,5 @@
 conditions:
-  - name: mostly_coffee_table
+  - name: coffee_table
     classes:
       control: 0.01
       couch: 0.01

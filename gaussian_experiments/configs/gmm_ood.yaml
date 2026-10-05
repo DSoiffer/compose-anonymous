@@ -1,6 +1,6 @@
-# OOD Gaussian mixture FKC experiment (alternate 4-mode "cross" geometry).
+# Out-of-distribution Gaussian mixture FKC experiment (4-mode "cross" geometry).
 #
-# Same product/ratio target structure as configs/gmm.yaml but with a 4-mode
+# Same product/ratio target structure as configs/gmm_id.yaml but with a 4-mode
 # layout: attr_a1 over the first two modes, attr_a2 over the last two, base
 # over all four; std=1.0; ground-truth sampled via importance sampling.
 

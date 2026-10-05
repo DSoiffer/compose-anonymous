@@ -1,5 +1,5 @@
 conditions:
-  - name: mostly_painting
+  - name: framed_painting
     classes:
       control: 0.01
       couch: 0.01

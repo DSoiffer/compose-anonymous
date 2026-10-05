@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from tqdm import trange
 
-from noise_schedule import VPSchedule
+from gaussian_experiments.noise_schedule import VPSchedule
 
 ScoreFn = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
 
@@ -40,7 +40,7 @@ def feynman_kac_sample(
     *,
     n_particles: int = 8,
     n_steps: int = 500,
-    g_clip: float | None = 10.0,
+    g_clip: float | None = 15.0,
     device: torch.device | str = "cuda",
     verbose: bool = True,
 ) -> torch.Tensor:

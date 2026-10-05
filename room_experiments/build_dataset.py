@@ -33,7 +33,6 @@ DEFAULT_CLASSES = [
     "framed_painting",
     "couch+coffee_table",
     "couch+framed_painting",
-    "coffee_table+framed_painting",
 ]
 
 
@@ -46,8 +45,8 @@ def parse_args():
     )
     parser.add_argument(
         "--gen_dir", type=Path, required=True,
-        help="Root of unlabeled generated images. Each class in --classes "
-        "must appear as a leaf folder somewhere under this root (e.g. "
+        help="Root of unlabeled generated images, as written by "
+        "generate_dataset_images.py: <gen_dir>/<category>/<class>/ (e.g. "
         "<gen_dir>/furniture/couch/, <gen_dir>/two_objects/couch+framed_painting/).",
     )
     parser.add_argument(
@@ -62,9 +61,8 @@ def parse_args():
     parser.add_argument(
         "--classes", type=str, nargs="+",
         default=DEFAULT_CLASSES,
-        help="Class names. Default includes 4 single classes "
-        "(control, coffee_table, couch, framed_painting) plus the three "
-        "two-object combinations of the non-control objects.",
+        help="Class names. Default: control, coffee_table, couch, "
+        "framed_painting, couch+coffee_table, couch+framed_painting.",
     )
     parser.add_argument(
         "--dinov2_model", type=str, default="facebook/dinov2-large",
@@ -151,9 +149,8 @@ def classify_generated(clf, model, processor, gen_dir: Path, exclude_filenames, 
 
 
 def find_class_dirs(gen_dir: Path, class_names) -> dict:
-    """Walk gen_dir at depth <=2 and find a leaf directory named <class> for
-    each class in class_names. The expected layout is
-    <gen_dir>/<category>/<class>/, matching generate_dataset_images.py output.
+    """Find the directory <gen_dir>/<category>/<class>/ for each class in
+    class_names, matching the generate_dataset_images.py output layout.
 
     Raises on missing or ambiguous matches.
     """
@@ -166,10 +163,6 @@ def find_class_dirs(gen_dir: Path, class_names) -> dict:
         for leaf in category.iterdir():
             if leaf.is_dir() and leaf.name in found:
                 found[leaf.name].append(leaf)
-        # Also accept class folders sitting directly under gen_dir (no
-        # intermediate category level).
-        if category.name in found:
-            found[category.name].append(category)
     missing = sorted(n for n, paths in found.items() if not paths)
     if missing:
         raise FileNotFoundError(

@@ -1,23 +1,22 @@
 """
 Generate training_prompts.yaml for use with the image-generating model.
-"""
 
+The prompts are an empty room (control), a room with each object in
+perturbations.yaml, and a room with the first object (the couch) together
+with each of the other objects.
+"""
 import os
+
 import yaml
-from itertools import combinations
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-with open(os.path.join(SCRIPT_DIR, "perturbations.yaml"), "r") as f:
-    data = yaml.safe_load(f)
-
 
 PLAIN_ROOM = (
     "A photograph of an empty living room with plain white walls and wooden floors. "
     "The room has a large window, and it is sunny outside. "
 )
 
-control_prompt = (
+CONTROL_PROMPT = (
     PLAIN_ROOM +
     "The room is completely empty. "
     "It contains no furniture, no decorations, no plants, and no other objects. "
@@ -63,31 +62,30 @@ def get_prompt_two_objects(phrase1, cat1, phrase2, cat2):
     )
 
 
-# Collect all include_small items, preserving yaml order
-objects = []  # (name, phrase, category)
-for name, attrs in data.items():
-    if attrs.get("include_small") and attrs["category"] in ("furniture", "wall_decor"):
-        objects.append((name, attrs["prompt_string"], attrs["category"]))
+def main():
+    with open(os.path.join(SCRIPT_DIR, "perturbations.yaml"), "r") as f:
+        data = yaml.safe_load(f)
+    objects = [(name, attrs["prompt_string"], attrs["category"]) for name, attrs in data.items()]
 
-prompt_dict = {"Control": {"category": "control", "prompt": control_prompt}}
+    prompt_dict = {"Control": {"category": "control", "prompt": CONTROL_PROMPT}}
+    for name, phrase, category in objects:
+        prompt_dict[name] = {"category": category, "prompt": get_prompt_single(phrase, category)}
+    # The first object (the couch) with each other object. Names use "+" with
+    # no spaces so folder names stay clean.
+    n1, p1, c1 = objects[0]
+    for n2, p2, c2 in objects[1:]:
+        prompt_dict[f"{n1}+{n2}"] = {
+            "category": "two_objects",
+            "prompt": get_prompt_two_objects(p1, c1, p2, c2),
+        }
 
-# Single-object
-for name, phrase, category in objects:
-    prompt_dict[name] = {"category": category, "prompt": get_prompt_single(phrase, category)}
+    print(f"Generated {len(prompt_dict)} prompts: 1 control + {len(objects)} singles + "
+          f"{len(objects) - 1} pairs")
+    outfile = os.path.join(SCRIPT_DIR, "training_prompts.yaml")
+    with open(outfile, "w") as f:
+        yaml.dump(prompt_dict, f, sort_keys=False, allow_unicode=True)
+    print(f"Saved to {outfile}")
 
-# Two-object pairs, name uses "+" with no spaces so folder names stay clean
-for (n1, p1, c1), (n2, p2, c2) in combinations(objects, 2):
-    combined_name = f"{n1}+{n2}"
-    prompt_dict[combined_name] = {
-        "category": "two_objects",
-        "prompt": get_prompt_two_objects(p1, c1, p2, c2),
-    }
 
-n_singles = len(objects)
-n_pairs = len(prompt_dict) - n_singles - 1  # subtract control
-print(f"Generated {len(prompt_dict)} prompts: 1 control + {n_singles} singles + {n_pairs} pairs")
-
-outfile = os.path.join(SCRIPT_DIR, "training_prompts.yaml")
-with open(outfile, "w") as f:
-    yaml.dump(prompt_dict, f, sort_keys=False, allow_unicode=True)
-print(f"Saved to {outfile}")
+if __name__ == "__main__":
+    main()

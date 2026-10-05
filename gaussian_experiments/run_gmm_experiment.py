@@ -4,8 +4,8 @@ Three conditions (a1, a2, base) share the same component means and std but
 have different component weights, analytical target is a1 * a2 / base.
 
 Two entry points:
-  python run_gmm_experiment.py [--config PATH]
-  python run_gmm_experiment.py [--config PATH] --sweep
+  python -m gaussian_experiments.run_gmm_experiment [--config PATH]
+  python -m gaussian_experiments.run_gmm_experiment [--config PATH] --sweep
 """
 
 import os
@@ -13,19 +13,19 @@ import os
 import numpy as np
 import torch
 
-from gmm_lib import IsotropicGMM, ProductRatioDistribution
-from noise_schedule import VPSchedule
-from score_model import (
+from gaussian_experiments.gmm_lib import IsotropicGMM, ProductRatioDistribution
+from gaussian_experiments.noise_schedule import VPSchedule
+from gaussian_experiments.score_model import (
     BoundConditionalModel,
     sample_eps_model,
     train_conditional_score_model,
     train_score_model,
 )
-from feynman_kac import feynman_kac_sample
-from evaluation import compute_distribution_metrics
-from sweep import sweep_training_and_particles
-from config import GMMConfig, CONFIGS_DIR, load_gmm_config
-from plotting import (
+from gaussian_experiments.feynman_kac import feynman_kac_sample
+from gaussian_experiments.evaluation import compute_distribution_metrics
+from gaussian_experiments.sweep import sweep_training_and_particles
+from gaussian_experiments.config import GMMConfig, CONFIGS_DIR, load_gmm_config
+from gaussian_experiments.plotting import (
     plot_comparison_summary,
     plot_distributions_overview,
     print_metrics,
@@ -36,7 +36,7 @@ from plotting import (
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 FIGURES_ROOT = os.path.join(SCRIPT_DIR, "figures")
 D = 2
-DEFAULT_CONFIG = str(CONFIGS_DIR / "gmm.yaml")
+DEFAULT_CONFIG = str(CONFIGS_DIR / "gmm_id.yaml")
 
 
 

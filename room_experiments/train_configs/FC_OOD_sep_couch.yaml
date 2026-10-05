@@ -1,5 +1,5 @@
 conditions:
-  - name: mostly_couch
+  - name: couch
     classes:
       control: 0.016666666666
       couch: 0.95

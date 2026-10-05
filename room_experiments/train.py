@@ -1,11 +1,8 @@
 """Class-conditional DDPM training for the furniture dataset.
 
-Trains a v-prediction UNet with zero-terminal-SNR rescaling. Either
-trains directly on raw class labels (one label per class folder under
---data_dir) or, when --conditions is set, on condition indices defined
-as mixture distributions over the underlying real classes (see 
-conditions YAMLs in train_configs/). --conditions is the main intended
-usage, and is how results in the paper are produced.
+Trains a v-prediction UNet with zero-terminal-SNR rescaling on condition
+indices, where each condition is a mixture distribution over the underlying
+real classes (see the conditions YAMLs in train_configs/).
 """
 
 import argparse
@@ -20,7 +17,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import yaml
-from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
+from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from PIL import Image
 from tqdm import tqdm
@@ -38,23 +35,17 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--data_dir", type=str, required=True,
-        help="Dataset root; must contain one subdirectory per class in --classes "
-        "(or per real class referenced by --conditions).",
+        help="Dataset root; must contain one subdirectory per real class "
+        "referenced by --conditions.",
     )
     parser.add_argument(
         "--output_dir", type=str, required=True,
         help="Directory to write checkpoints into.",
     )
     parser.add_argument(
-        "--classes", type=str, nargs="+", default=None,
-        help="Class names (label index = position in the list). Required unless "
-        "--conditions is given.",
-    )
-    parser.add_argument(
-        "--conditions", type=str, default=None,
+        "--conditions", type=str, required=True,
         help="Path to a YAML file defining training conditions (mixtures over real "
-        "classes). When set, the model is conditioned on the condition index and "
-        "--classes is ignored.",
+        "classes). The model is conditioned on the condition index.",
     )
     parser.add_argument("--num_epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=16)
@@ -77,13 +68,11 @@ def default_transform():
 
 
 class ClassSubsetDataset(Dataset):
-    """Loads images from data_dir/{class_name}/ for each class in classes,
-    with balanced sampling via sample_weights()."""
+    """Loads images from data_dir/{class_name}/ for each class in classes."""
 
     def __init__(self, data_dir, classes, transform=None):
         self.transform = transform if transform is not None else default_transform()
         self.samples = []
-        self.class_counts = []
         for idx, cls in enumerate(classes):
             cls_dir = os.path.join(data_dir, cls)
             if not os.path.isdir(cls_dir):
@@ -95,7 +84,6 @@ class ClassSubsetDataset(Dataset):
             if not paths:
                 raise ValueError(f"No images found for class '{cls}' in {cls_dir}")
             self.samples.extend((p, idx) for p in paths)
-            self.class_counts.append(len(paths))
 
     def __len__(self):
         return len(self.samples)
@@ -105,32 +93,25 @@ class ClassSubsetDataset(Dataset):
         image = Image.open(path).convert("RGB")
         return self.transform(image), label
 
-    def sample_weights(self):
-        class_weight = [1.0 / c for c in self.class_counts]
-        return [class_weight[label] for _, label in self.samples]
 
-
-def make_dataloader(data_dir, classes, batch_size, num_workers):
-    dataset = ClassSubsetDataset(data_dir, classes, transform=default_transform())
-    weights = dataset.sample_weights()
-    sampler = WeightedRandomSampler(weights, num_samples=len(dataset), replacement=True)
-    loader = DataLoader(
-        dataset, batch_size=batch_size, sampler=sampler,
-        num_workers=num_workers, pin_memory=True, drop_last=True,
-    )
-    return loader, dataset.class_counts
+def condition_real_classes(conditions):
+    """Sorted union of the real classes referenced by a conditions list."""
+    return sorted({c for cond in conditions for c in cond["classes"]})
 
 
 class ConditionDataset(Dataset):
     """Each "condition" is a mixture distribution over the underlying real classes.
     __getitem__ ignores the index: at every call we draw a condition uniformly,
     pick a real class according to that condition's mixture, then return a random
-    image from that class. The label returned is the condition index."""
+    image from that class. The label returned is the condition index.
+    exclude_paths removes specific images (e.g. a validation holdout) from the
+    sampling pool."""
 
-    def __init__(self, data_dir, conditions, transform=None):
+    def __init__(self, data_dir, conditions, transform=None, exclude_paths=None):
         self.transform = transform if transform is not None else default_transform()
+        exclude = set(exclude_paths) if exclude_paths else ()
 
-        real_classes = sorted({c for cond in conditions for c in cond["classes"]})
+        real_classes = condition_real_classes(conditions)
         cls_to_idx = {c: i for i, c in enumerate(real_classes)}
         self.real_classes = real_classes
 
@@ -143,6 +124,7 @@ class ConditionDataset(Dataset):
                 os.path.join(cls_dir, f) for f in os.listdir(cls_dir)
                 if f.lower().endswith(".png")
             )
+            paths = [p for p in paths if p not in exclude]
             if not paths:
                 raise ValueError(f"No images found for class '{cls}' in {cls_dir}")
             self.paths_by_class.append(paths)
@@ -181,13 +163,20 @@ class ConditionDataset(Dataset):
 
 
 def _worker_init_fn(worker_id):
-    seed = (torch.initial_seed() + worker_id) % (2**32)
+    # Fold in the distributed rank: torch.initial_seed() is identical across
+    # ranks when the trainer seeds torch globally, and ConditionDataset draws
+    # samples from `random` (ignoring the index), so without this every rank
+    # would see the same batches.
+    rank = int(os.environ.get("RANK", 0))
+    seed = (torch.initial_seed() + worker_id + 100_003 * rank) % (2**32)
     random.seed(seed)
     np.random.seed(seed)
 
 
-def make_condition_dataloader(data_dir, conditions, batch_size, num_workers):
-    dataset = ConditionDataset(data_dir, conditions, transform=default_transform())
+def make_condition_dataloader(data_dir, conditions, batch_size, num_workers,
+                              **dataset_kwargs):
+    dataset = ConditionDataset(data_dir, conditions, transform=default_transform(),
+                               **dataset_kwargs)
     loader = DataLoader(
         dataset, batch_size=batch_size, shuffle=False,
         num_workers=num_workers, pin_memory=True, drop_last=True,
@@ -198,46 +187,26 @@ def make_condition_dataloader(data_dir, conditions, batch_size, num_workers):
 
 def main():
     args = parse_args()
-    if args.conditions is None and not args.classes:
-        raise ValueError("Either --classes or --conditions must be provided.")
-    if args.conditions is not None and args.classes:
-        raise ValueError("--classes and --conditions are mutually exclusive.")
-
     accelerator = Accelerator(mixed_precision="bf16")
     batch_size = args.batch_size
 
-    conditions_list = None
-    if args.conditions is not None:
-        with open(args.conditions) as f:
-            conditions_list = yaml.safe_load(f)["conditions"]
+    with open(args.conditions) as f:
+        conditions_list = yaml.safe_load(f)["conditions"]
 
-    if conditions_list is not None:
-        train_dataloader, cond_dataset = make_condition_dataloader(
-            args.data_dir, conditions_list, batch_size, args.num_workers,
+    train_dataloader, cond_dataset = make_condition_dataloader(
+        args.data_dir, conditions_list, batch_size, args.num_workers,
+    )
+    label_names = [c["name"] for c in conditions_list]
+    num_label_classes = len(label_names)
+    if accelerator.is_main_process:
+        accelerator.print("Conditions:")
+        for cond in conditions_list:
+            accelerator.print(f"  {cond['name']}: {dict(cond['classes'])}")
+        for cls, paths in zip(cond_dataset.real_classes, cond_dataset.paths_by_class):
+            accelerator.print(f"  underlying {cls}: {len(paths)} images")
+        accelerator.print(
+            f"Total: {len(cond_dataset)} images, {num_label_classes} conditions"
         )
-        label_names = [c["name"] for c in conditions_list]
-        num_label_classes = len(label_names)
-        if accelerator.is_main_process:
-            accelerator.print("Conditions:")
-            for cond in conditions_list:
-                accelerator.print(f"  {cond['name']}: {dict(cond['classes'])}")
-            for cls, paths in zip(cond_dataset.real_classes, cond_dataset.paths_by_class):
-                accelerator.print(f"  underlying {cls}: {len(paths)} images")
-            accelerator.print(
-                f"Total: {len(cond_dataset)} images, {num_label_classes} conditions"
-            )
-    else:
-        train_dataloader, class_counts = make_dataloader(
-            args.data_dir, args.classes, batch_size, args.num_workers,
-        )
-        label_names = list(args.classes)
-        num_label_classes = len(label_names)
-        if accelerator.is_main_process:
-            for cls, count in zip(label_names, class_counts):
-                accelerator.print(f"  {cls}: {count} images")
-            accelerator.print(
-                f"Total: {sum(class_counts)} images, {num_label_classes} classes"
-            )
 
     model = UNet2DModel(
         sample_size=256, in_channels=3, out_channels=3,
@@ -341,9 +310,8 @@ def main():
             with open(save_path / "classes.json", "w") as f:
                 json.dump({"classes": label_names}, f)
 
-            if conditions_list is not None:
-                with open(save_path / "conditions.yaml", "w") as f:
-                    yaml.safe_dump({"conditions": conditions_list}, f, sort_keys=False)
+            with open(save_path / "conditions.yaml", "w") as f:
+                yaml.safe_dump({"conditions": conditions_list}, f, sort_keys=False)
 
             accelerator.print(f"Saved checkpoint to {save_path}")
 

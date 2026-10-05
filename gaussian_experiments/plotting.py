@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 from matplotlib import pyplot as plt
 
-from evaluation import sliced_w2
+from gaussian_experiments.evaluation import sliced_w2
 
 
 def annotate_metric(ax, text: str) -> None:

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 import torch
 from diffusers import DDPMScheduler, UNet2DModel
+from safetensors.torch import load_file
 from tqdm import trange
 
 
@@ -113,13 +117,23 @@ def _fkc_disc_core(
     n_particles: int,
     n_steps: int,
     device: torch.device,
+    fkc_max_step: int | None = None,
     verbose: bool = True,
 ) -> torch.Tensor:
     """Integer-k DDPM ancestral with FKC weighting and every-step resampling.
 
     model_preds_fn(x_img, k_int) -> list[Tensor] returns one v-prediction per
     product component (in the same order as betas).
+
+    fkc_max_step: if set, weight and resample only on the first `fkc_max_step`
+    steps. The remaining steps run the plain reverse process, with the particles
+    evolving independently and no reweighting. Because log_w is zeroed after
+    every resample, the final pick is then a uniform draw from the particles
+    that survived step `fkc_max_step - 1`. None (the default) weights at every
+    step. This counts reverse-process steps, not the continuous time t.
     """
+    if fkc_max_step is not None and fkc_max_step < 0:
+        raise ValueError(f"fkc_max_step must be >= 0, got {fkc_max_step}")
     K, N = n_particles, n_output
     B = N * K
     C, H, W = image_shape
@@ -163,6 +177,12 @@ def _fkc_disc_core(
 
             k_next = int(timesteps[step + 1].item()) if step < n_steps - 1 else 0
             preds_new = model_preds_fn(x, k_next)
+
+            if fkc_max_step is not None and step >= fkc_max_step:
+                # Gated off: no weighting and no resampling.
+                cached_preds = preds_new
+                continue
+
             scores_new = preds_to_scores_flat(preds_new, x, t_next)
             ws_new = sum(b * s for b, s in zip(betas, scores_new))
 
@@ -202,6 +222,7 @@ def fkc_sample_disc(
     n_particles: int,
     n_steps: int,
     device: torch.device,
+    fkc_max_step: int | None = None,
     verbose: bool = True,
 ) -> torch.Tensor:
     """FKC sampling with a single class-conditional UNet, one class label per
@@ -234,6 +255,7 @@ def fkc_sample_disc(
         n_particles=n_particles,
         n_steps=n_steps,
         device=device,
+        fkc_max_step=fkc_max_step,
         verbose=verbose,
     )
 
@@ -249,6 +271,7 @@ def fkc_sample_disc_multimodel(
     n_particles: int,
     n_steps: int,
     device: torch.device,
+    fkc_max_step: int | None = None,
     verbose: bool = True,
 ) -> torch.Tensor:
     """Multi-model FKC variant: one separate UNet per product component, each
@@ -273,5 +296,91 @@ def fkc_sample_disc_multimodel(
         n_particles=n_particles,
         n_steps=n_steps,
         device=device,
+        fkc_max_step=fkc_max_step,
         verbose=verbose,
+    )
+
+
+@torch.no_grad()
+def ancestral_sample(
+    predictors: list[tuple[torch.nn.Module, int]],
+    scheduler: DDPMScheduler,
+    betas: list[float],
+    shape: tuple[int, ...],
+    n_steps: int,
+    device: torch.device,
+) -> torch.Tensor:
+    """Plain DDPM ancestral sampling of the beta-weighted v-prediction (naive
+    composition, the K=1 case without FKC weights).
+
+    predictors: one (model, class label) pair per product component.
+    shape: (n, C, H, W) of the returned samples.
+    """
+    n = shape[0]
+    scheduler.set_timesteps(n_steps, device=device)
+    x = torch.randn(*shape, device=device)
+    for k in scheduler.timesteps:
+        k_int = int(k.item())
+        k_in = torch.full((n,), k_int, device=device, dtype=torch.long)
+        pred = torch.zeros_like(x)
+        for b, (model, label) in zip(betas, predictors):
+            labels = torch.full((n,), label, device=device, dtype=torch.long)
+            pred = pred + b * model(x, k_in, class_labels=labels).sample
+        x = scheduler.step(pred, k_int, x).prev_sample
+    return x
+
+
+# Pixel-space checkpoints written by train.py
+
+def load_checkpoint(checkpoint_dir: str | Path, device: torch.device):
+    """Load the UNet (EMA weights), scheduler, normalization stats, and condition
+    names from a training checkpoint produced by train.py."""
+    ckpt = Path(checkpoint_dir)
+    weights = ckpt / "ema_model" / "diffusion_pytorch_model.safetensors"
+    print(f"Loading weights from {weights}")
+    state_dict = load_file(str(weights))
+    with open(ckpt / "classes.json") as f:
+        classes = json.load(f)["classes"]
+
+    model = UNet2DModel(
+        sample_size=256,
+        in_channels=3,
+        out_channels=3,
+        layers_per_block=2,
+        block_out_channels=(128, 256, 256, 512),
+        down_block_types=("DownBlock2D", "DownBlock2D", "AttnDownBlock2D", "DownBlock2D"),
+        up_block_types=("UpBlock2D", "AttnUpBlock2D", "UpBlock2D", "UpBlock2D"),
+        num_class_embeds=len(classes),
+    ).to(device)
+    model.load_state_dict(state_dict)
+    model.eval()
+
+    scheduler = DDPMScheduler.from_pretrained(ckpt / "scheduler")
+    with open(ckpt / "normalize.json") as f:
+        norm = json.load(f)
+    data_mean, data_std = norm["mean"], norm["std"]
+    print(f"  classes={classes}")
+    print(f"  normalize: mean={data_mean}, std={data_std}")
+
+    return model, scheduler, classes, data_mean, data_std
+
+
+def denormalize(image: torch.Tensor, mean, std) -> torch.Tensor:
+    m = torch.tensor(mean, device=image.device, dtype=image.dtype).view(3, 1, 1)
+    s = torch.tensor(std, device=image.device, dtype=image.dtype).view(3, 1, 1)
+    return (image * s + m).clamp(0, 1)
+
+
+def scheduler_signature(scheduler):
+    """Identifying tuple of a DDPMScheduler config. Used to verify that
+    multimodel checkpoints share the same noise schedule; mismatch would
+    invalidate the FKC weight."""
+    cfg = scheduler.config
+    return (
+        cfg.prediction_type,
+        bool(getattr(cfg, "rescale_betas_zero_snr", False)),
+        int(cfg.num_train_timesteps),
+        float(cfg.beta_start),
+        float(cfg.beta_end),
+        cfg.beta_schedule,
     )

@@ -5,7 +5,7 @@ Each config has two top-level sections:
     target-distribution parameters,
   - shared `single_shot:` and `sweep:` sections holding pipeline knobs.
 
-See configs/gmm.yaml and configs/gaussian_2d.yaml for fully-populated
+See configs/gmm_id.yaml and configs/gaussian_2d_fc_ood.yaml for fully-populated
 examples. Loaders validate the keys they consume.
 """
 
