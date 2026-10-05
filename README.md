@@ -18,7 +18,7 @@ Install the dependencies with `uv sync` from this directory. `uv` can be install
 
 Depending on your GPU's CUDA compatibility, you may need to change all instances of `cu130` in `pyproject.toml` to an earlier version (for example, `cu129` for CUDA 12.9), and rerun `uv sync`. Gaussian experiments can also run on the CPU, but more slowly.
 
-Models and datasets are downloaded from the Hugging Face hub: FLUX.1-schnell (room dataset), DINOv2-large (room dataset filtering and factorization), CLIP ViT-B/32 (factorization), the CelebA dataset `flwrlabs/celeba`, and the FaceXFormer checkpoint. The room judge uses the OpenAI API and reads the `OPENAI_API_KEY` environment variable, which you must set to your own OpenAI API key.
+Models and datasets are downloaded from the Hugging Face hub: FLUX.1-schnell (for room dataset construction), DINOv2-large (room dataset filtering and factorization), CLIP ViT-B/32 (factorization), the CelebA dataset `flwrlabs/celeba`, and the FaceXFormer checkpoint. The room judge uses the OpenAI API and reads the `OPENAI_API_KEY` environment variable, which you must set to your own OpenAI API key.
 
 
 ## Running scripts
