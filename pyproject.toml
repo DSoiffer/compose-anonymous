@@ -42,4 +42,4 @@ torch = [
 torchvision = [
   { index = "pytorch-cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
-sd_embed = { git = "https://github.com/xhinker/sd_embed.git", rev = "4a47f71150a22942fa606fb741a1c971d95ba56f" }
+sd_embed = { git = "https://github.com/xhinker/sd_embed.git", rev = "main" }
