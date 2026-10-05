@@ -6,7 +6,7 @@ This repository contains the code for the experiments in the paper. Each directo
 |---|---|---|
 | `gaussian_experiments` | 2D Gaussian and Gaussian mixture experiments: training, FKC sampling sweeps, and the out-of-distribution support table. | Nothing. Runs on its own. |
 | `room_experiments` | Room image experiments: dataset construction, pixel-space and latent diffusion models, composition sampling, and the VLM judge. | FLUX.1-schnell and hand-labeled images to build the dataset. Later steps use the dataset and models built here. |
-| `celeba_experiments` | CelebA experiments: pixel-space and latent diffusion models, composition sampling, and FaceXFormer evaluation. | Nothing. The dataset downloads automatically. |
+| `celeba_experiments` | CelebA experiments: pixel-space and latent diffusion models, composition sampling, and FaceXFormer evaluation. | Nothing. (The CelebA dataset is downloaded automatically.) |
 | `factorization` | The mean-effect cosine heuristic for how factorized the room and CelebA conditions are. | The room dataset and trained autoencoders from `room_experiments` and `celeba_experiments`. |
 | `sensitivity_metric` | The rESS sensitivity metric: Gaussian families with their two figures, and density-ratio estimation with latent diffusion models. | `gaussian/`: nothing. `image/`: trained latent diffusion models from `room_experiments` and `celeba_experiments`, and held-out room images. |
 
