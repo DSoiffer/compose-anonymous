@@ -33,7 +33,7 @@ creates prompts from the `perturbations.yaml` file for an empty (`control`) room
 
 
 ### 2. Generate raw images per prompt
-Now use these prompts to generate `n` images per class with a text-to-image model. This requires you to supply the path to your downloaded text-to-image model (in this case, FLUX-schnell).
+Now use these prompts to generate `n` images per class with a text-to-image model. This requires you to supply the path to your downloaded text-to-image model (e.g., FLUX.1-schnell was used for our dataset construction), or a huggingface hub ID (e.g., `black-forest-labs/FLUX.1-schnell).
 
 ```
 python -m room_experiments.generate_dataset_images \

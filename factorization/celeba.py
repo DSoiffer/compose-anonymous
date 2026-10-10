@@ -5,9 +5,9 @@ For each pair (A, B) this prints
     |cos(mu(q10) - mu(q00), mu(q01) - mu(q00))|,
 
 where mu(q) is the mean feature of stratum q (q00 neither, q10 A only, q01 B
-only). Each stratum mean uses up to PER_STRATUM (20,000) images drawn
-uniformly (seed 0) from all CelebA images, train and held-out, as the 64x64
-uint8 images the models use; PER_STRATUM = -1 uses every image. The VAE row
+only). Each stratum mean uses up to --per_stratum (20,000) images drawn
+uniformly from all CelebA images, train and held-out, as the images the models 
+use, and --per_stratum -1 uses every image. The VAE row
 uses one autoencoder per pair.
 
     python -m factorization.celeba \\
@@ -30,7 +30,6 @@ SIZE = 64
 # Strata codes: q00 = neither attribute, q10 = A only, q01 = B only
 STRATA = {"q00": 0, "q10": 1, "q01": 2}
 ATTRIBUTES = ("Bangs", "Mouth_Slightly_Open", "Brown_Hair", "Wavy_Hair")
-PER_STRATUM = 20000  # images per stratum; -1 uses every image
 
 
 class _Images(Dataset):
@@ -55,6 +54,8 @@ def main() -> None:
     parser.add_argument("--vae_fc", required=True, help="autoencoder for the FC pair")
     parser.add_argument("--vae_nfc", required=True, help="autoencoder for the NFC pair")
     parser.add_argument("--workers", type=int, default=8, help="image loading processes")
+    parser.add_argument("--per_stratum", type=int, default=20000,
+                        help="images per stratum, -1 uses every image (which is slower, so default is only 20k)")
     args = parser.parse_args()
     device = torch.device("cuda")
     vaes = {"FC": args.vae_fc, "NFC": args.vae_nfc}
@@ -67,11 +68,11 @@ def main() -> None:
         code = metadata.attributes[a].astype(int) + 2 * metadata.attributes[b].astype(int)
         for stratum, c in STRATA.items():
             members = np.flatnonzero(code == c)
-            if PER_STRATUM == -1:
+            if args.per_stratum == -1:
                 selected[(pair, stratum)] = members
             else:
                 selected[(pair, stratum)] = rng.choice(
-                    members, size=min(PER_STRATUM, len(members)), replace=False)
+                    members, size=min(args.per_stratum, len(members)), replace=False)
 
     # Load every selected image once, in dataset order.
     index = np.unique(np.concatenate(list(selected.values())))

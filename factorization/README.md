@@ -41,3 +41,5 @@ python -m factorization.celeba \
   --vae_fc /path/to/checkpoints/vae_celeba_FC_ID/checkpoint-epoch50/ema_model \
   --vae_nfc /path/to/checkpoints/vae_celeba_NFC_ID/checkpoint-epoch50/ema_model
 ```
+
+Each mean uses at most 20,000 randomly chosen images per attribute group by default for quick evaluation. To use a different amount, set `--per_stratum -n` where `n` is the desired number of images. Set `n` to `-1` to use all images.
