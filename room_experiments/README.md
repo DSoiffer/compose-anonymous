@@ -6,7 +6,7 @@ This directory contains code for replicating the dataset and experimental result
 ## Running
 Before running, ensure you have installed all dependencies with `uv sync` from the root directory. `uv` can be installed [here](https://docs.astral.sh/uv/getting-started/installation/).
 
-In order to generate images for the dataset, you will also need to download the [FLUX.1-schnell model](https://huggingface.co/black-forest-labs/FLUX.1-schnell).
+In order to generate images for the dataset, you will also need to download the [FLUX.1-schnell model](https://huggingface.co/black-forest-labs/FLUX.1-schnell). It is automatically downloaded from the Hugging Face hub on first use, you must accept its license on the model page and log in with a Hugging Face token first (or download it manually). The (automatically) downloaded model is roughly 32GB, ensure you have space first.
 
 Run all commands below from the repository root (the parent of this directory).
 
@@ -33,19 +33,18 @@ creates prompts from the `perturbations.yaml` file for an empty (`control`) room
 
 
 ### 2. Generate raw images per prompt
-Now use these prompts to generate `n` images per class with a text-to-image model. This requires you to supply the path to your downloaded text-to-image model (e.g., FLUX.1-schnell was used for our dataset construction), or a huggingface hub ID (e.g., `black-forest-labs/FLUX.1-schnell).
+Now use these prompts to generate `n` images per class with a text-to-image model. This requires you to supply the path to your downloaded text-to-image model (e.g., FLUX.1-schnell was used for our dataset construction), or a huggingface hub ID (e.g., `black-forest-labs/FLUX.1-schnell`).
 
 ```
 python -m room_experiments.generate_dataset_images \
   --model_path /path/to/FLUX.1-schnell \
   --output_root /path/to/gen_images \
   --n 2000 \
-  --batch_size 20
 ```
 
 Images are written to `<output-root>/<category>/<item_name_lower>/image_<idx>.png` (so single-object classes land under e.g. `<output-root>/furniture/couch/` and pairs under `<output-root>/two_objects/couch+framed_painting/`).
 
-The `--only` argument restricts image generation to a subset of the prompts, e.g. `--only "Couch" "Couch+Framed painting"`. `--append` continues numbering past the highest existing index instead of overwriting from `image_1.png`.
+The `--only` argument restricts image generation to a subset of the prompts, e.g. `--only "Couch" "Couch+Framed painting"`. `--append` continues numbering past the highest existing index instead of overwriting from `image_1.png`, in case you need to generate additional images for the dataset.
 
 
 ### 3. Label a subset of the images
